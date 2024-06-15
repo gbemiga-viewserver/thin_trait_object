@@ -200,15 +200,17 @@ pub fn generate_dotnet_wrapper_objects_for_trait<'a>(
 ) -> syn::Result<TokenStream> {
     let StageStash {
         vtable_items,
+        trait_name,
         trait_object_name,
         ..
     } = stash;
 
-    struct VtableItemToImplThunk(VtableItem, String);
+    struct VtableItemToImplThunk(VtableItem, String,String);
     impl ToTokens for VtableItemToImplThunk {
         fn to_tokens(&self, token_stream: &mut TokenStream) {
             let signature = self.0.clone().into_signature(|x| format_ident!("__arg{}", x));
             let trait_object_name = format_ident!("{}", self.1);
+            let trait_name = format_ident!("{}", self.2);
             let call_args = signature
                 .inputs
                 .clone()
@@ -221,7 +223,7 @@ pub fn generate_dotnet_wrapper_objects_for_trait<'a>(
 
 
             let call_name = signature.ident.clone();
-            let func_name = format_ident!("{}", call_name);
+            let func_name = format_ident!("{}_{}",trait_name, call_name);
 
             let func_args = signature.inputs.iter().map(|arg| match arg {
                 FnArg::Typed(pat_type) => {
@@ -249,7 +251,7 @@ pub fn generate_dotnet_wrapper_objects_for_trait<'a>(
         }
     }
 
-    let impl_thunks = vtable_items.iter().cloned().map(|it | VtableItemToImplThunk(it, trait_object_name.to_string()));
+    let impl_thunks = vtable_items.iter().cloned().map(|it | VtableItemToImplThunk(it, trait_object_name.to_string(), trait_name.to_string()));
 
     let result = quote! {
            #(#impl_thunks)*
