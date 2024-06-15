@@ -100,6 +100,8 @@ pub fn attribute_main(attr: TokenStream, item: TokenStream) -> Result<TokenStrea
     let output = quote! {
         #vtable #repr #trait_object #dot_net_wrappers
     };
+
+
     Ok(output)
 }
 
