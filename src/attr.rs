@@ -91,10 +91,14 @@ pub fn attribute_main(attr: TokenStream, item: TokenStream) -> Result<TokenStrea
         &config.trait_object_attributes,
         &markers,
     )?;
+    let dot_net_wrappers = generate_dotnet_wrapper_objects_for_trait(
+        &mut stash,
+    )?;
+
     // We don't need to add the original input to the output here because the
     // public wrapper does that, see its definition for more on that.
     let output = quote! {
-        #vtable #repr #trait_object
+        #vtable #repr #trait_object #dot_net_wrappers
     };
     Ok(output)
 }

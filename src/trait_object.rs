@@ -188,6 +188,75 @@ pub fn generate_trait_object<'a>(
     Ok(result)
 }
 
+
+
+
+
+
+
+
+pub fn generate_dotnet_wrapper_objects_for_trait<'a>(
+    stash: &mut StageStash,
+) -> syn::Result<TokenStream> {
+    let StageStash {
+        vtable_items,
+        trait_object_name,
+        ..
+    } = stash;
+
+    struct VtableItemToImplThunk(VtableItem, String);
+    impl ToTokens for VtableItemToImplThunk {
+        fn to_tokens(&self, token_stream: &mut TokenStream) {
+            let signature = self.0.clone().into_signature(|x| format_ident!("__arg{}", x));
+            let trait_object_name = format_ident!("{}", self.1);
+            let call_args = signature
+                .inputs
+                .clone()
+                .into_iter()
+                .filter_map(|param| match param {
+                    FnArg::Typed(param) => Some(param.pat.into_token_stream()),
+                    FnArg::Receiver(_) => None,
+                })
+                .collect::<Punctuated<_, token::Comma>>();
+
+
+            let call_name = signature.ident.clone();
+            let func_name = format_ident!("{}", call_name);
+
+            let func_args = signature.inputs.iter().map(|arg| match arg {
+                FnArg::Typed(pat_type) => {
+                    let pat = &pat_type.pat;
+                    let ty = &pat_type.ty;
+                    quote! { #pat: #ty }
+                },
+                FnArg::Receiver(_) => quote! { obj: *const std::os::raw::c_void },
+            });
+
+            let output_type = match signature.output {
+                syn::ReturnType::Default => quote! { () },
+                syn::ReturnType::Type(_, ref ty) => quote! { #ty },
+            };
+
+            (quote! {
+                #[no_mangle]
+                pub extern "C" fn #func_name(instance_ptr: *mut std::ffi::c_void, #(#func_args),*) -> #output_type {
+                    let obj = unsafe { &mut *(instance_ptr as *mut #trait_object_name) };
+                    let result = obj.#call_name(#call_args);
+                    // Convert `result` to an FFI-safe structure here if needed
+                    result
+                }
+            }).to_tokens(token_stream);
+        }
+    }
+
+    let impl_thunks = vtable_items.iter().cloned().map(|it | VtableItemToImplThunk(it, trait_object_name.to_string()));
+
+    let result = quote! {
+           #(#impl_thunks)*
+    };
+    Ok(result)
+}
+
 fn check_attribute(attribute: &Attribute) -> syn::Result<()> {
     let name = &attribute.path;
     let ident = &name.segments[0].ident;
