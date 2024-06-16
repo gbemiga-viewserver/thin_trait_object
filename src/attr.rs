@@ -91,9 +91,9 @@ pub fn attribute_main(attr: TokenStream, item: TokenStream) -> Result<TokenStrea
         &config.trait_object_attributes,
         &markers,
     )?;
-    let dot_net_wrappers = generate_dotnet_wrapper_objects_for_trait(
+    let dot_net_wrappers = if config.generate_dot_net_wrappers { generate_dotnet_wrapper_objects_for_trait(
         &mut stash,
-    )?;
+    )?} else { TokenStream::new() };
 
     // We don't need to add the original input to the output here because the
     // public wrapper does that, see its definition for more on that.
@@ -116,6 +116,7 @@ struct Config {
     drop_abi: Option<Abi>,
     marker_traits: Option<Vec<MarkerTrait>>,
     store_layout: bool,
+    generate_dot_net_wrappers: bool,
 }
 impl From<AttrOptions> for Config {
     fn from(options: AttrOptions) -> Self {
@@ -147,6 +148,9 @@ impl From<AttrOptions> for Config {
                 AttrOption::StoreLayout { val, .. } => {
                     config.store_layout = val.value;
                 }
+                AttrOption::GenerateDotNetWrappers { val, .. } => {
+                    config.generate_dot_net_wrappers = val.value;
+                }
             }
         }
         config
@@ -168,6 +172,7 @@ impl Default for Config {
             drop_abi: None,
             marker_traits: None,
             store_layout: false,
+            generate_dot_net_wrappers: false,
         }
     }
 }

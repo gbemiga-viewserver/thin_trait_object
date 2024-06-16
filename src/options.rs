@@ -123,6 +123,11 @@ pub enum AttrOption {
         eq: Token![=],
         val: LitBool,
     },
+    GenerateDotNetWrappers {
+        name: custom_token::GenerateDotNetWrappers,
+        eq: Token![=],
+        val: LitBool,
+    },
 }
 impl Parse for AttrOption {
     fn parse(input: ParseStream<'_>) -> syn::Result<Self> {
@@ -166,6 +171,11 @@ impl Parse for AttrOption {
             }
             "store_layout" => Self::StoreLayout {
                 name: custom_token::StoreLayout(ident.span()),
+                eq: input.parse()?,
+                val: input.parse()?,
+            },
+            "generate_dotnet_wrappers" => Self::GenerateDotNetWrappers {
+                name: custom_token::GenerateDotNetWrappers(ident.span()),
                 eq: input.parse()?,
                 val: input.parse()?,
             },
@@ -234,5 +244,6 @@ pub mod custom_token {
         (DropAbi, "drop_abi"),
         (MarkerTraits, "marker_traits"),
         (StoreLayout, "store_layout"),
+        (GenerateDotNetWrappers, "generate_dot_net_wrappers"),
     }
 }
