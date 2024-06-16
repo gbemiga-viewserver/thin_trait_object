@@ -2,7 +2,7 @@
 
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote, ToTokens};
-use syn::{punctuated::Punctuated, token, Attribute, FnArg, Path, Visibility};
+use syn::{punctuated::Punctuated, token, Attribute, FnArg, Path, Visibility, Type};
 
 use crate::{attr::StageStash, marker_traits::MarkerTrait, vtable::VtableItem};
 
@@ -211,43 +211,81 @@ pub fn generate_dotnet_wrapper_objects_for_trait<'a>(
             let signature = self.0.clone().into_signature(|x| format_ident!("__arg{}", x));
             let trait_object_name = format_ident!("{}", self.1);
             let trait_name = format_ident!("{}", self.2);
-            let call_args = signature
-                .inputs
-                .clone()
-                .into_iter()
-                .filter_map(|param| match param {
-                    FnArg::Typed(param) => Some(param.pat.into_token_stream()),
-                    FnArg::Receiver(_) => None,
-                })
-                .collect::<Punctuated<_, token::Comma>>();
 
 
             let call_name = signature.ident.clone();
-            let func_name = format_ident!("{}_{}",trait_name, call_name);
+            let func_name = format_ident!("{}_{}", trait_name, call_name);
 
             let func_args = signature.inputs.iter().map(|arg| match arg {
                 FnArg::Typed(pat_type) => {
                     let pat = &pat_type.pat;
                     let ty = &pat_type.ty;
-                    quote! { #pat: #ty }
+                    if is_primitive(ty) {
+                        quote! { #pat: #ty }
+                    } else {
+                        quote! { #pat: *const std::os::raw::c_char }
+                    }
                 },
                 FnArg::Receiver(_) => quote! { obj: *const std::os::raw::c_void },
             });
 
-            let output_type = match signature.output {
+            let call_args = signature
+                .inputs
+                .clone()
+                .into_iter()
+                .filter_map(|param| match param {
+                    FnArg::Typed(pat_type) => {
+                        let pat = &pat_type.pat;
+                        let ty = &pat_type.ty;
+                        if is_primitive(ty) {
+                            Some(quote! { #pat })
+                        } else {
+                            Some(quote! {
+                                unsafe {
+                                    let c_str = std::ffi::CStr::from_ptr(#pat);
+                                    serde_json::from_str(c_str.to_str().unwrap()).unwrap()
+                                }
+                            })
+                        }
+                    },
+                    FnArg::Receiver(_) => None,
+                })
+                .collect::<Punctuated<_, token::Comma>>();
+
+
+            let output_type = match &signature.output {
                 syn::ReturnType::Default => quote! { () },
-                syn::ReturnType::Type(_, ref ty) => quote! { #ty },
+                syn::ReturnType::Type(_, ty) => {
+                    if is_primitive(ty) {
+                        quote! { #ty }
+                    } else {
+                        quote! { *const std::os::raw::c_char }
+                    }
+                }
+            };
+
+            let return_stmt = match &signature.output {
+                syn::ReturnType::Default => quote! {},
+                syn::ReturnType::Type(_, ty) => {
+                    if is_primitive(ty) {
+                        quote! { result }
+                    } else {
+                        quote! {
+                        let result_str = serde_json::to_string(&result).unwrap();
+                        std::ffi::CString::new(result_str).unwrap().into_raw()
+                    }
+                    }
+                }
             };
 
             (quote! {
-                #[no_mangle]
-                pub extern "C" fn #func_name(#(#func_args),*) -> #output_type {
-                    let obj = unsafe { &mut *(obj as *mut #trait_object_name) };
-                    let result = obj.#call_name(#call_args);
-                    // Convert `result` to an FFI-safe structure here if needed
-                    result
-                }
-            }).to_tokens(token_stream);
+            #[no_mangle]
+            pub extern "C" fn #func_name(#(#func_args),*) -> #output_type {
+                let obj = unsafe { &mut *(obj as *mut #trait_object_name) };
+                let result = obj.#call_name(#call_args);
+                #return_stmt
+            }
+        }).to_tokens(token_stream);
         }
     }
 
@@ -257,6 +295,18 @@ pub fn generate_dotnet_wrapper_objects_for_trait<'a>(
            #(#impl_thunks)*
     };
     Ok(result)
+}
+
+fn is_primitive(ty: &Box<Type>) -> bool {
+    matches!(
+        **ty,
+        Type::Path(ref p) if [
+            "i8", "i16", "i32", "i64", "i128",
+            "u8", "u16", "u32", "u64", "u128",
+            "f32", "f64",
+            "bool"
+        ].contains(&p.path.segments[0].ident.to_string().as_str())
+    )
 }
 
 fn check_attribute(attribute: &Attribute) -> syn::Result<()> {

@@ -25,6 +25,7 @@ quote = "1.0"
 replace_with = "0.1"
 # Sadly cannot use the default configuration because it can't parse traits
 syn = { version = "1.0", features = ["full", "extra-traits"] }
+serde_json = "1.0"
 
 [features]
 default = ["std"]
