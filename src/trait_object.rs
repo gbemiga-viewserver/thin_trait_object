@@ -282,7 +282,7 @@ pub fn generate_dotnet_wrapper_objects_for_trait<'a>(
             (quote! {
             #[no_mangle]
             pub extern "C" fn #func_name(#(#func_args),*) -> #output_type {
-                let obj = unsafe { &mut *(obj as *mut #trait_object_name) };
+                let obj = unsafe { #trait_object_name::from_raw(obj as *mut ())};
                 let result = obj.#call_name(#call_args);
                 #return_stmt
             }
