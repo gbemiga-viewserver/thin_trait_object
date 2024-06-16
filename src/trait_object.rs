@@ -243,7 +243,8 @@ pub fn generate_dotnet_wrapper_objects_for_trait<'a>(
                             Some(quote! {
                                 unsafe {
                                     let c_str = std::ffi::CStr::from_ptr(#pat);
-                                    serde_json::from_str(c_str.to_str().unwrap()).unwrap()
+                                    let string_unwrapped = c_str.to_str().unwrap();
+                                    serde_json::from_str(&string_unwrapped).expect(format!("Failed to parse json: {} to type {}", string_unwrapped,stringify!(ty)).as_str())
                                 }
                             })
                         }
@@ -271,7 +272,7 @@ pub fn generate_dotnet_wrapper_objects_for_trait<'a>(
                         quote! { result }
                     } else {
                         quote! {
-                        let result_str = serde_json::to_string(&result).unwrap();
+                        let result_str = serde_json::to_string(&result).expect(format!("Failed to parse json: {} to type {}", string_unwrapped,stringify!(ty)).as_str());
                         std::ffi::CString::new(result_str).unwrap().into_raw()
                     }
                     }
