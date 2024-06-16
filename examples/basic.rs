@@ -1,6 +1,6 @@
 use thin_trait_object::*;
 
-#[thin_trait_object]
+#[thin_trait_object(generate_dotnet_wrappers = false)]
 trait Foo {
     fn fooify(&self, extra_data: &str);
 }

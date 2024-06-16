@@ -183,7 +183,7 @@ impl Parse for AttrOption {
                 return Err(syn::Error::new_spanned(
                     ident,
                     "\
-expected `vtable`, `inline_vtable`, `trait_object`, `drop_abi` or `marker_traits`",
+expected `vtable`, `inline_vtable`, `trait_object`, `drop_abi` , `store_layout` , `generate_dotnet_wrappers` or `marker_traits`",
                 ));
             }
         };
