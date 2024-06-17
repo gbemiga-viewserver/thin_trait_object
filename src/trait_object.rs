@@ -285,6 +285,7 @@ pub fn generate_dotnet_wrapper_objects_for_trait<'a>(
             #[no_mangle]
             pub extern "C" fn #func_name(instance_ptr: *mut std::ffi::c_void, #(#func_args),*) -> #output_type {
                 let mut obj = unsafe { #trait_object_name::from_raw(instance_ptr as *mut ())};
+                log::info!("Calling: {}", stringify!(#trait_object_name::#call_name(#call_args)));
                 let result = obj.#call_name(#call_args);
                 #return_stmt
             }
