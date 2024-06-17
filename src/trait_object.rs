@@ -216,6 +216,7 @@ pub fn generate_dotnet_wrapper_objects_for_trait<'a>(
             let call_name = signature.ident.clone();
             let func_name = format_ident!("{}_{}", trait_name, call_name);
 
+
             let func_args = signature.inputs.iter().map(|arg| match arg {
                 FnArg::Typed(pat_type) => {
                     let pat = &pat_type.pat;
@@ -226,7 +227,7 @@ pub fn generate_dotnet_wrapper_objects_for_trait<'a>(
                         quote! { #pat: *const std::os::raw::c_char }
                     }
                 },
-                FnArg::Receiver(_) => quote! { obj: *const std::os::raw::c_void },
+                FnArg::Receiver(_) => quote! { instance_ptr: *mut std::ffi::c_void },
             });
 
             let call_args = signature
@@ -241,21 +242,26 @@ pub fn generate_dotnet_wrapper_objects_for_trait<'a>(
                             Some(quote! { #pat })
                         } else {
                             Some(quote! {
-                                unsafe {
-                                    let c_str = std::ffi::CStr::from_ptr(#pat);
-                                    let string_unwrapped = c_str.to_str().unwrap();
-                                    serde_json::from_str(&string_unwrapped).expect(format!("Failed to parse json: {} to type {}.", string_unwrapped,stringify!(#ty)).as_str())
+                            unsafe {
+                                let c_str = std::ffi::CStr::from_ptr(#pat);
+                                let string_unwrapped = match c_str.to_str() {
+                                    Ok(s) => s,
+                                    Err(_) => return std::ptr::null(),
+                                };
+                                match serde_json::from_str(&string_unwrapped) {
+                                    Ok(parsed) => parsed,
+                                    Err(_) => return std::ptr::null(),
                                 }
-                            })
+                            }
+                        })
                         }
                     },
                     FnArg::Receiver(_) => None,
                 })
                 .collect::<Punctuated<_, token::Comma>>();
 
-
             let output_type = match &signature.output {
-                syn::ReturnType::Default => quote! { () },
+                syn::ReturnType::Default => quote! { *const std::os::raw::c_char  },
                 syn::ReturnType::Type(_, ty) => {
                     if is_primitive(ty) {
                         quote! { #ty }
@@ -266,16 +272,21 @@ pub fn generate_dotnet_wrapper_objects_for_trait<'a>(
             };
 
             let return_stmt = match &signature.output {
-                syn::ReturnType::Default => quote! {},
+                syn::ReturnType::Default => quote! {return std::ptr::null()},
                 syn::ReturnType::Type(_, ty) => {
                     if is_primitive(ty) {
                         quote! { result }
                     } else {
                         quote! {
-                        let result_str = serde_json::to_string(&result).expect(format!("Failed to parse json: {:? } to type {}.", result,stringify!(#ty)).as_str());
+                        let result_str = match serde_json::to_string(&result) {
+                            Ok(json) => json,
+                            Err(_) => return std::ptr::null(),
+                        };
                         log::info!("Result: {}", result_str);
-                        let output = std::ffi::CString::new(result_str);
-                        output.unwrap().into_raw()
+                        match std::ffi::CString::new(result_str) {
+                            Ok(c_string) => c_string.into_raw(),
+                            Err(_) => std::ptr::null(),
+                        }
                     }
                     }
                 }
@@ -283,8 +294,8 @@ pub fn generate_dotnet_wrapper_objects_for_trait<'a>(
 
             (quote! {
             #[no_mangle]
-            pub extern "C" fn #func_name(instance_ptr: *mut std::ffi::c_void, #(#func_args),*) -> #output_type {
-                let mut obj = unsafe { #trait_object_name::from_raw(instance_ptr as *mut ())};
+            pub extern "C" fn #func_name(#(#func_args),*) -> #output_type {
+                let mut obj = unsafe { #trait_object_name::from_raw(instance_ptr as *mut ()) };
                 log::info!("Calling: {}", stringify!(#trait_object_name::#call_name));
                 let result = obj.#call_name(#call_args);
                 #return_stmt
