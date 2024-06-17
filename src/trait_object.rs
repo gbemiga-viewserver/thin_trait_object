@@ -244,14 +244,8 @@ pub fn generate_dotnet_wrapper_objects_for_trait<'a>(
                             Some(quote! {
                             unsafe {
                                 let c_str = std::ffi::CStr::from_ptr(#pat);
-                                let string_unwrapped = match c_str.to_str() {
-                                    Ok(s) => s,
-                                    Err(_) => return std::ptr::null(),
-                                };
-                                match serde_json::from_str(&string_unwrapped) {
-                                    Ok(parsed) => parsed,
-                                    Err(_) => return std::ptr::null(),
-                                }
+                                let string_unwrapped = c_str.to_str().expect("Failed to get string from c string");
+                                serde_json::from_str(&string_unwrapped).expect("Failed to get typed result from result")
                             }
                         })
                         }
@@ -278,15 +272,9 @@ pub fn generate_dotnet_wrapper_objects_for_trait<'a>(
                         quote! { result }
                     } else {
                         quote! {
-                        let result_str = match serde_json::to_string(&result) {
-                            Ok(json) => json,
-                            Err(_) => return std::ptr::null(),
-                        };
+                        let result_str = serde_json::to_string(&result).expect("Failed to serialize result");
                         log::info!("Result: {}", result_str);
-                        match std::ffi::CString::new(result_str) {
-                            Ok(c_string) => c_string.into_raw(),
-                            Err(_) => std::ptr::null(),
-                        }
+                        std::ffi::CString::new(result_str).expect("Failed to get typed result from string result")
                     }
                     }
                 }
