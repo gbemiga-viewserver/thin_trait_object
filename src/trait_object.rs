@@ -273,7 +273,8 @@ pub fn generate_dotnet_wrapper_objects_for_trait<'a>(
                     } else {
                         quote! {
                         let result_str = serde_json::to_string(&result).expect(format!("Failed to parse json: {:? } to type {}.", result,stringify!(#ty)).as_str());
-                        std::ffi::CString::new(result_str).unwrap().into_raw()
+                        let output = std::ffi::CString::new(result_str);
+                        output.unwrap().into_raw()
                     }
                     }
                 }
