@@ -245,7 +245,7 @@ pub fn generate_dotnet_wrapper_objects_for_trait<'a>(
                             Some(quote! {
                                 let #arg_name = {
                                     let r1 = #pat;
-                                    log::info!("Primitive Param: {} {:?}",stringify!(#pat), r1);
+                                    log::trace!("Primitive Param: {} {:?}",stringify!(#pat), r1);
                                     r1
                                 }
                             })
@@ -254,7 +254,7 @@ pub fn generate_dotnet_wrapper_objects_for_trait<'a>(
                             Some(quote! {
                             let #arg_name = unsafe {
                                 if #pat.is_null() {
-                                    log::info!("String Param: {} is null", stringify!(#pat));
+                                    log::trace!("String Param: {} is null", stringify!(#pat));
                                     String::new() // or any default value you want to return
                                 } else {
                                     let c_str = std::ffi::CStr::from_ptr(#pat);
@@ -273,7 +273,7 @@ pub fn generate_dotnet_wrapper_objects_for_trait<'a>(
                                     let c_str = std::ffi::CStr::from_ptr(#pat);
                                     let string_unwrapped = c_str.to_str().expect("Failed to get string from C string");
                                     let r1 = string_unwrapped.to_string();
-                                    log::info!("str Param: {} {:?}", stringify!(#pat), r1);
+                                    log::trace!("str Param: {} {:?}", stringify!(#pat), r1);
                                     r1
                                 }
                             };
@@ -284,7 +284,7 @@ pub fn generate_dotnet_wrapper_objects_for_trait<'a>(
                                 let c_str = std::ffi::CStr::from_ptr(#pat);
                                 let string_unwrapped = c_str.to_str().expect("Failed to get string from c string");
                                 let r1 = serde_json::from_str(&string_unwrapped).expect(format!("Failed to serialize param {} type {} from string {}", stringify!(#pat), stringify!(#ty), string_unwrapped).as_str());
-                                log::info!("Typed Param: {} {:?}",stringify!(#pat), r1);
+                                log::trace!("Typed Param: {} {:?}",stringify!(#pat), r1);
                                 r1
                             }
                         })
@@ -334,9 +334,9 @@ pub fn generate_dotnet_wrapper_objects_for_trait<'a>(
                         quote! { result }
                     } else {
                         quote! {
-                        log::info!("Unserialized Result: {:?}", result);
+                        log::trace!("Unserialized Result: {:?}", result);
                         let result_str = serde_json::to_string(&result).expect("Failed to serialize result");
-                        log::info!("Serialized Result: {}", result_str);
+                        log::trace!("Serialized Result: {}", result_str);
                         std::ffi::CString::new(result_str).expect("Failed to get typed result from string result").into_raw()
                     }
                     }
@@ -347,7 +347,7 @@ pub fn generate_dotnet_wrapper_objects_for_trait<'a>(
             #[no_mangle]
             pub extern "C" fn #func_name(#(#func_args),*) -> #output_type {
                 let mut obj = unsafe { #trait_object_name::from_raw(instance_ptr as *mut ()) };
-                log::info!("Calling: {}", stringify!(#trait_object_name::#call_name));
+                log::trace!("Calling: {}", stringify!(#trait_object_name::#call_name));
                 let panicresult = ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| {
                     #call_args_declarations;
                     obj.#call_name(#call_args)
@@ -357,7 +357,7 @@ pub fn generate_dotnet_wrapper_objects_for_trait<'a>(
 
                 match panicresult {
                     ::std::result::Result::Ok(result) => {
-                        ::log::info!("Finished Calling: {}", ::std::stringify!(#trait_object_name::#call_name));
+                        ::log::trace!("Finished Calling: {}", ::std::stringify!(#trait_object_name::#call_name));
                         #return_stmt// Assuming `#return_stmt` uses the value returned from `#call_name`
                     }
                     ::std::result::Result::Err(err) => {
