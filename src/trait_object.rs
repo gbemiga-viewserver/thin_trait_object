@@ -307,7 +307,7 @@ pub fn generate_dotnet_wrapper_objects_for_trait<'a>(
                         #return_stmt// Assuming `#return_stmt` uses the value returned from `#call_name`
                     }
                     ::std::result::Result::Err(err) => {
-                        ::log::error!("Error calling {}: {:?}", ::std::stringify!(#trait_object_name::#call_name), e);
+                        ::log::error!("Error calling {}: {:?}", ::std::stringify!(#trait_object_name::#call_name), err);
                         let result = format!("{{\"Err\" : \"{:?}\"}}", err);
                         #return_stmt
                     }
