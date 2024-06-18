@@ -272,8 +272,9 @@ pub fn generate_dotnet_wrapper_objects_for_trait<'a>(
                         quote! { result }
                     } else {
                         quote! {
+                        log::info!("Unserialized Result: {:?}", result);
                         let result_str = serde_json::to_string(&result).expect("Failed to serialize result");
-                        log::info!("Result: {}", result_str);
+                        log::info!("Serialized Result: {}", result_str);
                         std::ffi::CString::new(result_str).expect("Failed to get typed result from string result").into_raw()
                     }
                     }
