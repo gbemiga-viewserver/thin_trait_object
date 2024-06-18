@@ -1,8 +1,8 @@
 //! Generates the owned trait object struct. Not to be confused with the representation struct.
 
-use proc_macro2::TokenStream;
+use proc_macro2::{Ident, TokenStream};
 use quote::{format_ident, quote, ToTokens};
-use syn::{punctuated::Punctuated, token, Attribute, FnArg, Path, Visibility, Type, TypePath};
+use syn::{punctuated::Punctuated, token, Attribute, FnArg, Path, Visibility, Type, TypePath, Pat};
 
 use crate::{attr::StageStash, marker_traits::MarkerTrait, vtable::VtableItem};
 
@@ -230,7 +230,7 @@ pub fn generate_dotnet_wrapper_objects_for_trait<'a>(
                 FnArg::Receiver(_) => quote! { instance_ptr: *mut std::ffi::c_void },
             });
 
-            let call_args = signature
+            let call_args_declarations = signature
                 .inputs
                 .clone()
                 .into_iter()
@@ -238,9 +238,12 @@ pub fn generate_dotnet_wrapper_objects_for_trait<'a>(
                     FnArg::Typed(pat_type) => {
                         let pat = &pat_type.pat;
                         let ty = &pat_type.ty;
+
+                        let arg_name = pat_to_ident(pat);
+
                         if is_primitive(ty) {
                             Some(quote! {
-                                {
+                                let #arg_name = {
                                     let r1 = #pat;
                                     log::info!("Primitive Param: {} {:?}",stringify!(#pat), r1);
                                     r1
@@ -249,7 +252,7 @@ pub fn generate_dotnet_wrapper_objects_for_trait<'a>(
                         }
                         else if is_string(ty) {
                             Some(quote! {
-                            unsafe {
+                            let #arg_name = unsafe {
                                 if #pat.is_null() {
                                     log::info!("String Param: {} is null", stringify!(#pat));
                                     String::new() // or any default value you want to return
@@ -257,28 +260,27 @@ pub fn generate_dotnet_wrapper_objects_for_trait<'a>(
                                     let c_str = std::ffi::CStr::from_ptr(#pat);
                                     let string_unwrapped = c_str.to_str().expect("Failed to get string from C string");
                                     let r1 = string_unwrapped.to_string();
-                                    log::info!("String Param: {} {:?}", stringify!(#pat), r1);
                                     r1
                                 }
                             }
                         })
                         }  else if is_str(ty) {
                             Some(quote! {
-                            unsafe {
+                            let #arg_name = unsafe {
                                 if #pat.is_null() {
-                                    ""
+                                    String::new()
                                 } else {
                                     let c_str = std::ffi::CStr::from_ptr(#pat);
                                     let string_unwrapped = c_str.to_str().expect("Failed to get string from C string");
                                     let r1 = string_unwrapped.to_string();
-                                    log::info!("String Param: {} {:?}", stringify!(#pat), r1);
-                                    r1.as_str()
+                                    log::info!("str Param: {} {:?}", stringify!(#pat), r1);
+                                    r1
                                 }
-                            }
+                            };
                         })
                         } else {
                             Some(quote! {
-                            unsafe {
+                           let #arg_name =  unsafe {
                                 let c_str = std::ffi::CStr::from_ptr(#pat);
                                 let string_unwrapped = c_str.to_str().expect("Failed to get string from c string");
                                 let r1 = serde_json::from_str(&string_unwrapped).expect(format!("Failed to serialize param {} type {} from string {}", stringify!(#pat), stringify!(#ty), string_unwrapped).as_str());
@@ -286,6 +288,28 @@ pub fn generate_dotnet_wrapper_objects_for_trait<'a>(
                                 r1
                             }
                         })
+                        }
+                    },
+                    FnArg::Receiver(_) => None,
+                })
+                .collect::<Punctuated<_, token::Semi>>();
+            let call_args = signature
+                .inputs
+                .clone()
+                .into_iter()
+                .filter_map(|param| match param {
+                    FnArg::Typed(pat_type) => {
+                        let pat = &pat_type.pat;
+                        let ty = &pat_type.ty;
+                        let arg_name = pat_to_ident(pat);
+                        if is_str(ty) {
+                            Some(quote! {
+                                &#arg_name
+                            })
+                        }else{
+                            Some(quote! {
+                                #arg_name
+                            })
                         }
                     },
                     FnArg::Receiver(_) => None,
@@ -325,6 +349,7 @@ pub fn generate_dotnet_wrapper_objects_for_trait<'a>(
                 let mut obj = unsafe { #trait_object_name::from_raw(instance_ptr as *mut ()) };
                 log::info!("Calling: {}", stringify!(#trait_object_name::#call_name));
                 let panicresult = ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| {
+                    #call_args_declarations;
                     obj.#call_name(#call_args)
                 }));
 
@@ -352,6 +377,14 @@ pub fn generate_dotnet_wrapper_objects_for_trait<'a>(
            #(#impl_thunks)*
     };
     Ok(result)
+}
+
+fn pat_to_ident(pat: &Box<Pat>) -> Ident {
+    if let Pat::Ident(pat_ident) = &**pat {
+        format_ident!("arg_{}", pat_ident.ident)
+    } else {
+        panic!("Unsupported pattern type");
+    }
 }
 
 fn is_primitive(ty: &Box<Type>) -> bool {
