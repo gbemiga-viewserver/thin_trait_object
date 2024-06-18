@@ -267,7 +267,7 @@ pub fn generate_dotnet_wrapper_objects_for_trait<'a>(
                             unsafe {
                                 let c_str = std::ffi::CStr::from_ptr(#pat);
                                 let string_unwrapped = c_str.to_str().expect("Failed to get string from c string");
-                                let r1 = serde_json::from_str(&string_unwrapped).expect(format!("Failed to serialize param {} from string {}", stringify!(#pat), string_unwrapped).as_str());
+                                let r1 = serde_json::from_str(&string_unwrapped).expect(format!("Failed to serialize param {} type {} from string {}", stringify!(#pat), stringify!(#ty), string_unwrapped).as_str());
                                 log::info!("Typed Param: {} {:?}",stringify!(#pat), r1);
                                 r1
                             }
