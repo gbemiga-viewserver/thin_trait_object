@@ -250,11 +250,16 @@ pub fn generate_dotnet_wrapper_objects_for_trait<'a>(
                         else if is_string(ty) {
                             Some(quote! {
                             unsafe {
-                                let c_str = std::ffi::CStr::from_ptr(#pat);
-                                let string_unwrapped = c_str.to_str().expect("Failed to get string from c string");
-                                let r1 = string_unwrapped.to_string();
-                                log::info!("String Param: {} {:?}",stringify!(#pat), r1);
-                                r1
+                                if #pat.is_null() {
+                                    log::info!("String Param: {} is null", stringify!(#pat));
+                                    String::new() // or any default value you want to return
+                                } else {
+                                    let c_str = std::ffi::CStr::from_ptr(#pat);
+                                    let string_unwrapped = c_str.to_str().expect("Failed to get string from C string");
+                                    let r1 = string_unwrapped.to_string();
+                                    log::info!("String Param: {} {:?}", stringify!(#pat), r1);
+                                    r1
+                                }
                             }
                         })
                         } else {
