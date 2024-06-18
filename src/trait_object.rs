@@ -262,6 +262,20 @@ pub fn generate_dotnet_wrapper_objects_for_trait<'a>(
                                 }
                             }
                         })
+                        }  else if is_str(ty) {
+                            Some(quote! {
+                            unsafe {
+                                if #pat.is_null() {
+                                    ""
+                                } else {
+                                    let c_str = std::ffi::CStr::from_ptr(#pat);
+                                    let string_unwrapped = c_str.to_str().expect("Failed to get string from C string");
+                                    let r1 = string_unwrapped.to_string();
+                                    log::info!("String Param: {} {:?}", stringify!(#pat), r1);
+                                    r1.as_str()
+                                }
+                            }
+                        })
                         } else {
                             Some(quote! {
                             unsafe {
@@ -356,6 +370,14 @@ fn is_string(ty: &Box<Type>) -> bool {
         **ty,
         Type::Path(ref p) if [
             "String"
+        ].contains(&p.path.segments[0].ident.to_string().as_str())
+    )
+}
+fn is_str(ty: &Box<Type>) -> bool {
+    matches!(
+        **ty,
+        Type::Path(ref p) if [
+            "&str"
         ].contains(&p.path.segments[0].ident.to_string().as_str())
     )
 }
