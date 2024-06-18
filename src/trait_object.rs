@@ -374,12 +374,12 @@ fn is_string(ty: &Box<Type>) -> bool {
     )
 }
 fn is_str(ty: &Box<Type>) -> bool {
-    matches!(
-        **ty,
-        Type::Path(ref p) if [
-            "&str"
-        ].contains(&p.path.segments[0].ident.to_string().as_str())
-    )
+    if let Type::Path(type_path) = &**ty {
+        if let Some(segment) = type_path.path.segments.first() {
+            return segment.ident == "str";
+        }
+    }
+    false
 }
 
 fn check_attribute(attribute: &Attribute) -> syn::Result<()> {
