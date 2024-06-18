@@ -295,10 +295,23 @@ pub fn generate_dotnet_wrapper_objects_for_trait<'a>(
             pub extern "C" fn #func_name(#(#func_args),*) -> #output_type {
                 let mut obj = unsafe { #trait_object_name::from_raw(instance_ptr as *mut ()) };
                 log::info!("Calling: {}", stringify!(#trait_object_name::#call_name));
-                let result = obj.#call_name(#call_args);
-                log::info!("Finished Calling: {}", stringify!(#trait_object_name::#call_name));
-                unsafe { obj.into_raw(); } //Stops pointer from being destroyed after each call
-                #return_stmt
+                let panicresult = ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| {
+                    obj.#call_name(#call_args)
+                }));
+
+                unsafe { obj.into_raw(); } // Stops pointer from being destroyed after each call
+
+                match panicresult {
+                    ::std::result::Result::Ok(result) => {
+                        ::log::info!("Finished Calling: {}", ::std::stringify!(#trait_object_name::#call_name));
+                        #return_stmt// Assuming `#return_stmt` uses the value returned from `#call_name`
+                    }
+                    ::std::result::Result::Err(err) => {
+                        ::log::error!("Error calling {}: {:?}", ::std::stringify!(#trait_object_name::#call_name), e);
+                        let result = format!("{{\"Err\" : \"{:?}\"}}", err);
+                        #return_stmt
+                    }
+                }
             }
         }).to_tokens(token_stream);
         }
