@@ -246,7 +246,7 @@ pub fn generate_dotnet_wrapper_objects_for_trait<'a>(
                             unsafe {
                                 let c_str = std::ffi::CStr::from_ptr(#pat);
                                 let string_unwrapped = c_str.to_str().expect("Failed to get string from c string");
-                                string_unwrapped
+                                string_unwrapped.to_string()
                             }
                         })
                         } else {
