@@ -286,6 +286,7 @@ pub fn generate_dotnet_wrapper_objects_for_trait<'a>(
                 let mut obj = unsafe { #trait_object_name::from_raw(instance_ptr as *mut ()) };
                 log::info!("Calling: {}", stringify!(#trait_object_name::#call_name));
                 let result = obj.#call_name(#call_args);
+                log::info!("Finished Calling: {}", stringify!(#trait_object_name::#call_name));
                 unsafe { obj.into_raw(); } //Stops pointer from being destroyed after each call
                 #return_stmt
             }
