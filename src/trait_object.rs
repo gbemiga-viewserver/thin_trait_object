@@ -240,6 +240,15 @@ pub fn generate_dotnet_wrapper_objects_for_trait<'a>(
                         let ty = &pat_type.ty;
                         if is_primitive(ty) {
                             Some(quote! { #pat })
+                        }
+                        else if is_string(ty) {
+                            Some(quote! {
+                            unsafe {
+                                let c_str = std::ffi::CStr::from_ptr(#pat);
+                                let string_unwrapped = c_str.to_str().expect("Failed to get string from c string");
+                                string_unwrapped
+                            }
+                        })
                         } else {
                             Some(quote! {
                             unsafe {
@@ -311,6 +320,14 @@ fn is_primitive(ty: &Box<Type>) -> bool {
             "u8", "u16", "u32", "u64", "u128",
             "f32", "f64",
             "bool"
+        ].contains(&p.path.segments[0].ident.to_string().as_str())
+    )
+}
+fn is_string(ty: &Box<Type>) -> bool {
+    matches!(
+        **ty,
+        Type::Path(ref p) if [
+            "String"
         ].contains(&p.path.segments[0].ident.to_string().as_str())
     )
 }
