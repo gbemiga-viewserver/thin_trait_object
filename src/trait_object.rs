@@ -2,7 +2,7 @@
 
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote, ToTokens};
-use syn::{punctuated::Punctuated, token, Attribute, FnArg, Path, Visibility, Type};
+use syn::{punctuated::Punctuated, token, Attribute, FnArg, Path, Visibility, Type, TypePath};
 
 use crate::{attr::StageStash, marker_traits::MarkerTrait, vtable::VtableItem};
 
@@ -377,6 +377,13 @@ fn is_str(ty: &Box<Type>) -> bool {
     if let Type::Path(type_path) = &**ty {
         if let Some(segment) = type_path.path.segments.first() {
             return segment.ident == "str";
+        }
+    }
+    if let Type::Reference(type_reference) = &**ty {
+        if let Type::Path(TypePath { path, .. }) = &*type_reference.elem {
+            if let Some(segment) = path.segments.first() {
+                return segment.ident == "str";
+            }
         }
     }
     false
